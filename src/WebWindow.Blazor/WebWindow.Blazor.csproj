@@ -1,0 +1,52 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net5.0</TargetFrameworks>
+    <Title>BlazorWindow</Title>
+    <PackageDescription>Host a Blazor application inside a native OS window on Windows, Mac, and Linux</PackageDescription>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <Platforms>AnyCPU;x64;x86</Platforms>
+    <NativeOutputDir>..\WebWindow.Native\$(Platform)\$(Configuration)\</NativeOutputDir>
+    <IsMacOS>$([MSBuild]::IsOsPlatform('OSX'))</IsMacOS>
+    <NativeAssetRuntimeIdentifier Condition="'$(OS)' == 'Windows_NT' AND '$(Platform)' == 'x64'">win-x64</NativeAssetRuntimeIdentifier>
+    <NativeAssetRuntimeIdentifier Condition="'$(OS)' == 'Windows_NT' AND '$(Platform)' == 'x86'">win-x86</NativeAssetRuntimeIdentifier>
+    <NativeAssetRuntimeIdentifier Condition="'$(OS)' != 'Windows_NT' AND '$(IsMacOS)' != 'true'">linux-x64</NativeAssetRuntimeIdentifier>
+    <NativeAssetRuntimeIdentifier Condition="'$(OS)' != 'Windows_NT' AND '$(IsMacOS)' == 'true'">osx-x64</NativeAssetRuntimeIdentifier>
+    <Platforms>x64;x86</Platforms>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <PackageId>BlazorWindow</PackageId>
+    <NuspecProperties>version=$([System.DateTime]::Now.ToString(&quot;yyyyMMdd.mm&quot;))</NuspecProperties>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Blazor" Version="$(BlazorPackageVersion)" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="3.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="3.1.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="3.0.0" />
+    <EmbeddedResource Include="../WebWindow.Blazor.JS/dist/blazor.desktop.js" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(OS)' == 'Windows_NT' AND '$(Configuration)' == 'Debug'">
+    <ProjectReference Include="..\WebWindow.Native\WebWindow.Native.vcxproj" />
+  </ItemGroup>
+
+  <Target Name="BuildNonWindowsNative" Condition="'$(OS)' != 'Windows_NT'" BeforeTargets="Build">
+    <MakeDir Directories="..\WebWindow.Native\x64\$(Configuration)" />
+    <Exec Condition="'$(IsMacOS)' == 'true'" WorkingDirectory="..\WebWindow.Native" Command="gcc -shared -lstdc++ -DOS_MAC -framework Cocoa -framework WebKit WebWindow.Mac.mm Exports.cpp WebWindow.Mac.AppDelegate.mm WebWindow.Mac.UiDelegate.mm WebWindow.Mac.UrlSchemeHandler.m -o x64/$(Configuration)/WebWindow.Native.dylib" />
+    <Exec Condition="'$(IsMacOS)' != 'true'" WorkingDirectory="..\WebWindow.Native" Command="gcc -std=c++11 -shared -DOS_LINUX Exports.cpp WebWindow.Linux.cpp -o x64/$(Configuration)/WebWindow.Native.so `pkg-config --cflags --libs gtk+-3.0 webkit2gtk-4.0` -fPIC" />
+  </Target>
+
+  <ItemGroup>
+    <_NativeLibraries Include="$(NativeOutputDir)WebWindow.Native.dll" Condition="Exists('$(NativeOutputDir)WebWindow.Native.dll')" />
+    <_NativeLibraries Include="$(NativeOutputDir)WebView2Loader.dll" Condition="Exists('$(NativeOutputDir)WebView2Loader.dll')" />
+    <_NativeLibraries Include="$(NativeOutputDir)WebWindow.Native.so" Condition="Exists('$(NativeOutputDir)WebWindow.Native.so')" />
+    <_NativeLibraries Include="$(NativeOutputDir)WebWindow.Native.dylib" Condition="Exists('$(NativeOutputDir)WebWindow.Native.dylib')" />
+    <Content Include="@(_NativeLibraries)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>%(Filename)%(Extension)</Link>
+      <Pack>true</Pack>
+      <PackagePath>runtimes/$(NativeAssetRuntimeIdentifier)/native/%(Filename)%(Extension)</PackagePath>
+    </Content>
+  </ItemGroup>
+
+</Project>
